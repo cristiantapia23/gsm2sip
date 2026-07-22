@@ -1,6 +1,6 @@
 # SIP-GSM Gateway
 
-Android app that bridges GSM calls (local SIM) with the CallAgent SIP/Asterisk server.
+Android app that bridges GSM calls (local SIM) with the callagent.pro SIP/Asterisk server.
 
 | Dialer | SIP Registration |
 |--------|-----------------|
