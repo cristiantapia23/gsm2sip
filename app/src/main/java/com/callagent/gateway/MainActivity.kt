@@ -398,8 +398,11 @@ class MainActivity : AppCompatActivity() {
             addAction(GatewayService.STATUS_ACTION)
             addAction(GatewayService.LOG_ACTION)
         }
-        registerReceiver(statusReceiver, filter, Context.RECEIVER_EXPORTED)
-
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(statusReceiver, filter, Context.RECEIVER_EXPORTED)
+        } else {
+            registerReceiver(statusReceiver, filter)
+        }
         // Replay any log messages buffered while activity was paused
         val buffered = GatewayService.drainLogBuffer()
         for (msg in buffered) {
