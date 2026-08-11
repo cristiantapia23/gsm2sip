@@ -9,7 +9,7 @@ android {
 
     defaultConfig {
         applicationId = "com.callagent.gateway"
-        minSdk = 26
+        minSdk = 21
         targetSdk = 34
         versionCode = 329
         versionName = "2.8.51"
