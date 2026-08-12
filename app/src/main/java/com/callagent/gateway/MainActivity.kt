@@ -155,12 +155,9 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
             } else if (call == null && lastGsmPollState != -1) {
-                // GSM call was seen by poll but is now gone — call ended
                 scheduleInCallClose()
                 return
             } else if (call == null && lastGsmPollState == -1) {
-                // Never saw a GSM call — failed dial or slow setup
-                // Safety timeout to avoid stuck screen
                 if (System.currentTimeMillis() - inCallOpenTime > 8000) {
                     closeInCallScreen()
                     return
@@ -217,8 +214,6 @@ class MainActivity : AppCompatActivity() {
                         updateCallButton()
                     }
 
-                    // Show in-call screen for incoming calls on Dialer or Calls tab
-                    // On Settings tab the gateway still auto-answers — status + log is enough
                     if (!inCallOpen && state == "GSM_RINGING") {
                         val callerNum = info.removePrefix("GSM call from ")
                         if (currentTab == "dialer" || currentTab == "calls") {
@@ -242,9 +237,7 @@ class MainActivity : AppCompatActivity() {
                                 }
                             }
                             "TEARING_DOWN" -> tvInCallStatus.text = "Ending..."
-                            "IDLE" -> {
-                                scheduleInCallClose()
-                            }
+                            "IDLE" -> scheduleInCallClose()
                         }
                     }
 
@@ -291,7 +284,6 @@ class MainActivity : AppCompatActivity() {
         tvLog = findViewById(R.id.tvLog)
         svLog = findViewById(R.id.svLog)
 
-        // Fresh log on every app (re)start — clear both the view and the service buffer
         tvLog.text = ""
         GatewayService.drainLogBuffer()
         btnStart = findViewById(R.id.btnStart)
@@ -323,6 +315,7 @@ class MainActivity : AppCompatActivity() {
         btnCopyLog.setOnClickListener { copyLog() }
         btnConfig.setOnClickListener { showConfigDialog() }
         btnInfo.setOnClickListener { showInfoDialog() }
+        
         // Calls-tab click listeners
         findViewById<ImageButton>(R.id.btnCallLogClear).setOnClickListener { confirmClearCallLog() }
         btnFilterIn.setOnClickListener { setCallLogFilter("IN") }
@@ -335,7 +328,6 @@ class MainActivity : AppCompatActivity() {
         requestBatteryOptimizationExemption()
         requestDefaultDialerRole()
 
-        // Auto-start gateway if autoconnect enabled and credentials configured
         autoStartGateway()
     }
 
@@ -375,7 +367,6 @@ class MainActivity : AppCompatActivity() {
         tabLabelCalls.setTextColor(if (tab == "calls") activeColor else inactiveColor)
         tabLabelSettings.setTextColor(if (tab == "settings") activeColor else inactiveColor)
 
-        // Refresh call log when switching to Calls tab
         if (tab == "calls") {
             refreshCallLog()
         }
@@ -384,7 +375,7 @@ class MainActivity : AppCompatActivity() {
     @Suppress("DEPRECATION")
     override fun onBackPressed() {
         if (inCallOpen) {
-            return // must use END CALL
+            return
         } else if (currentTab != "dialer") {
             switchTab("dialer")
         } else {
@@ -403,7 +394,7 @@ class MainActivity : AppCompatActivity() {
         } else {
             registerReceiver(statusReceiver, filter)
         }
-        // Replay any log messages buffered while activity was paused
+        
         val buffered = GatewayService.drainLogBuffer()
         for (msg in buffered) {
             appendLog(msg)
@@ -427,7 +418,6 @@ class MainActivity : AppCompatActivity() {
             refreshCallButtonState()
         }
 
-        // Refresh calls tab if visible
         if (currentTab == "calls") {
             refreshCallLog()
         }
@@ -820,13 +810,11 @@ class MainActivity : AppCompatActivity() {
             }
 
             val hasRoot = try {
-                // Modern Magisk doesn't place su at fixed paths — try executing it.
                 val proc = Runtime.getRuntime().exec(arrayOf("su", "-c", "id"))
                 val exitCode = proc.waitFor()
                 proc.destroy()
                 exitCode == 0
             } catch (_: Exception) {
-                // Fallback: check legacy paths
                 try {
                     java.io.File("/system/bin/su").exists() ||
                         java.io.File("/system/xbin/su").exists() ||
@@ -862,7 +850,8 @@ class MainActivity : AppCompatActivity() {
                 }
                 container.addView(divider)
 
-                val gatewayReady = hasRecordAudio && isDefaultDialer && hasUsableSource && hasCaptureOutput
+                // MODIFICADO: No exigir CAPTURE_AUDIO_OUTPUT para dar por lista la gateway
+                val gatewayReady = hasRecordAudio && isDefaultDialer && hasUsableSource
                 val verdict = TextView(this).apply {
                     text = if (gatewayReady) {
                         val src = if (hasDownlink) "VOICE_DOWNLINK" else
@@ -871,7 +860,6 @@ class MainActivity : AppCompatActivity() {
                     } else {
                         val missing = mutableListOf<String>()
                         if (!hasRecordAudio) missing.add("RECORD_AUDIO")
-                        if (!hasCaptureOutput) missing.add("CAPTURE_AUDIO_OUTPUT")
                         if (!isDefaultDialer) missing.add("Default Dialer")
                         if (!hasUsableSource) missing.add("audio source")
                         "\u2717 Not ready: missing ${missing.joinToString(", ")}"
@@ -929,11 +917,9 @@ class MainActivity : AppCompatActivity() {
             btnFilterIn.imageTintList = inactiveIconTint
         }
 
-        // Use cached data — instant switch, no I/O
         showCallLog()
     }
 
-    /** Pre-load both IN and OUT lists off the main thread so tab switching is instant */
     private fun preloadCallLog() {
         val ctx = this
         Thread {
@@ -942,7 +928,6 @@ class MainActivity : AppCompatActivity() {
             cachedOutEntries = all.filter { it.direction == "OUT" }.take(MAX_CALL_LOG)
             callLogBuiltIn = false
             callLogBuiltOut = false
-            // Build current filter's UI
             runOnUiThread { showCallLog() }
         }.start()
     }
@@ -951,7 +936,6 @@ class MainActivity : AppCompatActivity() {
         preloadCallLog()
     }
 
-    /** Show the already-cached list for the current filter — runs on UI thread, no I/O */
     private fun showCallLog() {
         val entries = if (callLogFilter == "IN") cachedInEntries else cachedOutEntries
         buildCallLogUI(entries)
@@ -971,10 +955,6 @@ class MainActivity : AppCompatActivity() {
 
         val dp = resources.displayMetrics.density
         val dateFmt = SimpleDateFormat("dd/MM HH:mm", Locale.US)
-        val cardBg = android.graphics.drawable.GradientDrawable().apply {
-            setColor(0xFF374151.toInt())
-            cornerRadius = 16 * dp
-        }
 
         for (entry in entries) {
             val number = entry.number.ifEmpty { "Unknown" }
@@ -1005,7 +985,6 @@ class MainActivity : AppCompatActivity() {
                 setOnClickListener { openDiallerWithNumber(number) }
             }
 
-            // Two-line text block (number + details)
             val textBlock = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
@@ -1019,7 +998,6 @@ class MainActivity : AppCompatActivity() {
                 setTextColor(0xFFFFFFFF.toInt())
             }
 
-            // Second line: direction icon + date + duration
             val detailRow = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
@@ -1067,7 +1045,6 @@ class MainActivity : AppCompatActivity() {
             textBlock.addView(tvNum)
             textBlock.addView(detailRow)
 
-            // Call button on right side
             val btnCall = ImageView(this).apply {
                 val btnSize = (40 * dp).toInt()
                 layoutParams = LinearLayout.LayoutParams(btnSize, btnSize).apply {
@@ -1193,7 +1170,6 @@ class MainActivity : AppCompatActivity() {
 
     private var inCallCloseScheduled = false
 
-    /** Show "Call ended" briefly then close the in-call screen */
     private fun scheduleInCallClose() {
         if (!inCallOpen || inCallCloseScheduled) return
         inCallCloseScheduled = true
@@ -1212,7 +1188,7 @@ class MainActivity : AppCompatActivity() {
         tvInCallStatus.text = "Calling..."
         tvInCallTimer.visibility = View.GONE
         viewBeforeInCall = currentTab
-        // Hide tabs, show in-call overlay
+
         tabbedRoot.visibility = View.GONE
         inCallView.visibility = View.VISIBLE
         callTimerHandler.removeCallbacks(gsmPollRunnable)
@@ -1230,7 +1206,7 @@ class MainActivity : AppCompatActivity() {
         tabbedRoot.visibility = View.VISIBLE
         gsmCallActive = false
         updateCallButton()
-        // Refresh calls list if returning to calls tab
+
         if (currentTab == "calls") {
             refreshCallLog()
         }
