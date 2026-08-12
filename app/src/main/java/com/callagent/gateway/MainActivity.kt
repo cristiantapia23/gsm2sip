@@ -81,7 +81,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnFilterOut: ImageButton
     private var callLogFilter = "IN"
 
-    // Pre-cached call log lists (built once, swapped on filter change)
+    // Pre-cached call log lists
     private var cachedInEntries: List<CallLogEntry> = emptyList()
     private var cachedOutEntries: List<CallLogEntry> = emptyList()
     private var callLogBuiltIn = false
@@ -850,7 +850,6 @@ class MainActivity : AppCompatActivity() {
                 }
                 container.addView(divider)
 
-                // No exigir CAPTURE_AUDIO_OUTPUT para dar por lista la gateway
                 val gatewayReady = hasRecordAudio && isDefaultDialer && hasUsableSource
                 val verdict = TextView(this).apply {
                     text = if (gatewayReady) {
@@ -1352,12 +1351,8 @@ class MainActivity : AppCompatActivity() {
             perms.add(Manifest.permission.POST_NOTIFICATIONS)
         }
 
-        val needed = perms.filter {
-            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
-        }
-        if (needed.isNotEmpty()) {
-            ActivityCompat.requestPermissions(this, needed.toTypedArray(), REQ_PERMS)
-        }
+        // Solicitar todos los permisos en la vista emergente de inicio
+        ActivityCompat.requestPermissions(this, perms.toTypedArray(), REQ_PERMS)
     }
 
     private fun requestDefaultDialerRole() {
