@@ -850,7 +850,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 container.addView(divider)
 
-                // MODIFICADO: No exigir CAPTURE_AUDIO_OUTPUT para dar por lista la gateway
+                // No exigir CAPTURE_AUDIO_OUTPUT para dar por lista la gateway
                 val gatewayReady = hasRecordAudio && isDefaultDialer && hasUsableSource
                 val verdict = TextView(this).apply {
                     text = if (gatewayReady) {
