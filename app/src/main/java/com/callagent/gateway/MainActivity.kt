@@ -717,9 +717,18 @@ class MainActivity : AppCompatActivity() {
                 this, Manifest.permission.READ_PHONE_STATE
             ) == PackageManager.PERMISSION_GRANTED
 
-            val hasAnswerCalls = ContextCompat.checkSelfPermission(
-                this, Manifest.permission.ANSWER_PHONE_CALLS
-            ) == PackageManager.PERMISSION_GRANTED
+            val telecomMgr = getSystemService(Context.TELECOM_SERVICE) as TelecomManager
+            val isDefaultDialer = packageName == telecomMgr.defaultDialerPackage
+
+            // Adaptación para Android 7/MIUI: En SDK < 26 (Android 8), el permiso no existe formalmente.
+            // La capacidad la otorga ser el Default Dialer.
+            val hasAnswerCalls = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                ContextCompat.checkSelfPermission(
+                    this, Manifest.permission.ANSWER_PHONE_CALLS
+                ) == PackageManager.PERMISSION_GRANTED
+            } else {
+                isDefaultDialer
+            }
 
             val hasCallPhone = ContextCompat.checkSelfPermission(
                 this, Manifest.permission.CALL_PHONE
@@ -735,8 +744,6 @@ class MainActivity : AppCompatActivity() {
             results.add(CheckResult("CALL_PHONE", hasCallPhone))
             results.add(CheckResult("READ_PHONE_STATE", hasPhoneState))
 
-            val telecomMgr = getSystemService(Context.TELECOM_SERVICE) as TelecomManager
-            val isDefaultDialer = packageName == telecomMgr.defaultDialerPackage
             results.add(CheckResult("Default Dialer", isDefaultDialer, if (isDefaultDialer) "" else "required for InCallService"))
 
             data class SourceTest(val source: Int, val name: String, val rate: Int)
@@ -1340,10 +1347,14 @@ class MainActivity : AppCompatActivity() {
             Manifest.permission.RECORD_AUDIO,
             Manifest.permission.READ_PHONE_STATE,
             Manifest.permission.CALL_PHONE,
-            Manifest.permission.ANSWER_PHONE_CALLS,
             Manifest.permission.READ_CALL_LOG,
             Manifest.permission.ACCESS_FINE_LOCATION
         )
+
+        // Solicitamos ANSWER_PHONE_CALLS únicamente si la versión del SDK es Android 8.0 (API 26) o superior
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            perms.add(Manifest.permission.ANSWER_PHONE_CALLS)
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             perms.add(Manifest.permission.READ_PHONE_NUMBERS)
         }
@@ -1351,7 +1362,6 @@ class MainActivity : AppCompatActivity() {
             perms.add(Manifest.permission.POST_NOTIFICATIONS)
         }
 
-        // Solicitar todos los permisos en la vista emergente de inicio
         ActivityCompat.requestPermissions(this, perms.toTypedArray(), REQ_PERMS)
     }
 
